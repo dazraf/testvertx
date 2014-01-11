@@ -1,0 +1,71 @@
+<html>
+<head>
+<title>Event Demo</title>
+<link rel="shortcut icon" href="/static/img/fa.gif">
+<link href="/static/css/bootstrap.css" rel="stylesheet">
+<link href="/static/css/jumbotron-narrow.css" rel="stylesheet">
+<script type="text/javascript" src="/static/js/vertxbus-2.1.js"></script>
+<script type="text/javascript" src="/static/js/jquery-2.0.3.min.js"></script>
+<script type="text/javascript" src="/static/js/knockout-3.0.0.js"></script>
+<script>
+
+$(function() {
+
+  var fxvm = new FXViewModel([]);
+  ko.applyBindings(fxvm);
+  
+  var socket = new WebSocket("ws://localhost:8081/services/event");
+  socket.onmessage = function (event) {
+    var data = JSON.parse(event.data).items;        
+    fxvm.values.removeAll();
+    for (var i in data) {
+      var v = data[i];
+      fxvm.values.push({pair: v.pair, tenor: v.tenor, value: Number(v.value).toFixed(4)}); 
+    }
+  }
+  function FXViewModel (values) {
+    var self = this;
+    self.values = ko.observableArray(values);
+  }  
+});
+
+</script>
+  
+</head>
+<body>
+<div class="container">
+<div class="header">
+<ul class="nav nav-pills pull-right">
+<li class="active"><a href="/static/index.html">Home</a></li>
+</ul>
+<h3 class="text-muted">Test Vert.X - Event Demo</h3>
+</div>
+
+<table class="table table-condensed table-bordered">
+<thead>
+<tr>
+<th>Pair</th>
+<th>Tenor</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody data-bind="foreach: values">
+<tr>
+<td data-bind="text: pair"></td>
+<td data-bind="text: tenor"></td>
+<td data-bind="text: value"></td>
+</tr>
+</tbody>
+</table>
+
+<div class="row marketing">
+</div>
+
+<div class="footer">
+<span style="-moz-transform: scaleX(-1); -o-transform: scaleX(-1); -webkit-transform: scaleX(-1); transform: scaleX(-1); display: inline-block;">
+&copy;
+</span> Fuzz 2013
+</div>
+</div> <!-- /container -->
+</body>
+</html>

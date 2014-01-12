@@ -7,27 +7,77 @@
 <script type="text/javascript" src="/static/js/vertxbus-2.1.js"></script>
 <script type="text/javascript" src="/static/js/jquery-2.0.3.min.js"></script>
 <script type="text/javascript" src="/static/js/knockout-3.0.0.js"></script>
+<script type="text/javascript" src="/static/js/d3.min.js"></script>
+<script type="text/javascript" src="/static/js/cubism.v1.min.js"></script>
+
 <script>
+var context = cubism.context()
+    .serverDelay(0)
+    .clientDelay(0)
+    .step(1e3)
+    .size(700);
 
 $(function() {
-  var fxvm = new FXViewModel([]);
-  ko.applyBindings(fxvm);
-  
-  var socket = new WebSocket("ws://localhost:8081/fx/event");
-  socket.onmessage = function (event) {
-    var data = JSON.parse(event.data).items;        
-    fxvm.values.removeAll();
-    for (var i in data) {
-      var v = data[i];
-      fxvm.values.push({pair: v.pair, tenor: v.tenor, value: Number(v.value).toFixed(4)}); 
-    }
-  }
-  function FXViewModel (values) {
-    var self = this;
-    self.values = ko.observableArray(values);
-  }  
+  getCurrentRates();
+  setupWebSocket();  
+  setupChart();
 });
 
+function getCurrentRates() {
+  $.ajax({
+    url: "/fx/",
+    cache: false
+  }).done(function(data) {
+    console.log(data);
+  })
+}
+
+function setupWebSocket() {
+  var socket = new WebSocket("ws://localhost:8081/fx/event");
+  socket.onmessage = function (event) {
+    var data = JSON.parse(event.data).items;
+    console.log(event.data);
+  }
+}
+
+function random(name) {
+  var value = 0,
+      values = [],
+      i = 0,
+      last;
+  return context.metric(function(start, stop, step, callback) {
+    // convert to milliseconds
+    start = +start, stop = +stop;
+    if (isNaN(last)) last = start;
+    while (last < stop) {
+      last += step;
+      value = Math.max(-10, Math.min(10, value + .8 * Math.random() - .4 + .2 * Math.cos(i += .2)));
+      values.push(value);
+    }
+    callback(null, values = values.slice((start - stop) / step));
+  }, name);
+}
+
+function setupChart() {
+  var foo = random('foo');
+  var bar = random('bar');
+
+  d3.select('#chart').call(function(div) {
+    div.append("div")
+        .attr("class", "axis")
+        .call(context.axis().orient("top"));
+
+    div.selectAll(".horizon")
+        .data([foo, bar, foo.add(bar), foo.subtract(bar)])
+      .enter().append("div")
+        .attr("class", "horizon")
+        .call(context.horizon().extent([-20, 20]));
+
+    div.append("div")
+        .attr("class", "rule")
+        .call(context.rule());
+  });
+}
 </script>
   
 </head>
@@ -40,25 +90,8 @@ $(function() {
 <h3 class="text-muted">Test Vert.X - Event Demo</h3>
 </div>
 
-<table class="table table-condensed table-bordered">
-<thead>
-<tr>
-<th>Pair</th>
-<th>Tenor</th>
-<th>Value</th>
-</tr>
-</thead>
-<tbody data-bind="foreach: values">
-<tr>
-<td data-bind="text: pair"></td>
-<td data-bind="text: tenor"></td>
-<td data-bind="text: value"></td>
-</tr>
-</tbody>
-</table>
 
-<div class="row marketing">
-</div>
+<div id="chart"></div>
 
 <div class="footer">
 <span style="-moz-transform: scaleX(-1); -o-transform: scaleX(-1); -webkit-transform: scaleX(-1); transform: scaleX(-1); display: inline-block;">

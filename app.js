@@ -5,10 +5,10 @@ var log = container.logger;
 container.deployModule('fuzz~web~1.0');
 log.info("App: the web module is deployed");
 
-/*
+
 container.deployModule('fuzz~event~1.0');
 log.info("App: the event module is deployed");
-*/
+
 
 container.deployModule('fuzz~fx~1.0');
 log.info("App: the fx module is deployed");

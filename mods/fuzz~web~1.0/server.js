@@ -1,10 +1,12 @@
 var vertx = require('vertx');
 var container = require('vertx/container');
 var http = require('vertx/http');
+load('messages.js');
+
 var log = container.logger;
 var bus = vertx.eventBus;
 
-var requestTopic = "fxservice.request";
+var fxRequestTopic = messages.fxservice.requestTopic;
 
 var routeMatcher = new http.RouteMatcher();
 
@@ -19,7 +21,7 @@ routeMatcher.get('/favicon.ico', function(req) {
 });
 
 routeMatcher.get('/fx/', function(req) {
-	bus.send(requestTopic, null, function(data) {
+	bus.send(fxRequestTopic, null, function(data) {
 		req.response.headers('Content-Type', 'application/json');
 		req.response.end(data);
 	})

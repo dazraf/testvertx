@@ -3,12 +3,13 @@ var container = require('vertx/container');
 var http = require('vertx/http');
 var log = container.logger;
 var bus = vertx.eventBus;
+load('messages.js');
+var topic = messages.fxservice.changeTopic;
 
 var server = http.createHttpServer();
-var topic = "fxservice.change";
 
 server.websocketHandler(function(websocket) {
-	if (websocket.path() === '/services/event') {
+	if (websocket.path() === '/fx/event') {
 		var listener = new FXClient(websocket);
 		var busCallback = function (data) {
 		  listener.publish(data);
@@ -21,7 +22,7 @@ server.websocketHandler(function(websocket) {
 		});
 		log.info("websocket setup.")
 	} else {
-		log.warning("Rejecting connection for " + websocket.path())
+		log.warn("Rejecting connection for " + websocket.path())
 		websocket.reject();
 	}        
 })

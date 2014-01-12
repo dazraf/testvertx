@@ -3,57 +3,28 @@ var container = require('vertx/container');
 var http = require('vertx/http');
 var log = container.logger;
 var bus = vertx.eventBus;
+load('messages.js');
+var changeTopic = messages.fxservice.changeTopic;
+var requestTopic = messages.fxservice.requestTopic;
 
-var changeTopic = "fxservice.change";
-var requestTopic = "fxservice.request";
 var wsPort = 8081;
 
 var liveRates = {
-	'eurusd.spot': {pair: 'eurusd', tenor: 'spot', value: 1.3791},
-	'eurusd.1w': {pair: 'eurusd', tenor: '1w', value: -1.22},
-	'eurgbp.spot': {pair: 'eurgbp', tenor: 'spot', value: 0.8341},
-	'eurgbp.1w': {pair: 'eurgbp', tenor: '1w', value: -8.9}
+	'eurusd.spot': {pair: 'eurusd', tenor: 'spot', value: 1.3791, ts: Date.now()},
+	'eurusd.1w': {pair: 'eurusd', tenor: '1w', value: -1.22, ts: Date.now()},
+	'eurgbp.spot': {pair: 'eurgbp', tenor: 'spot', value: 0.8341, ts: Date.now()},
+	'eurgbp.1w': {pair: 'eurgbp', tenor: '1w', value: -8.9, ts: Date.now()}
 };
 
 var names = Object.getOwnPropertyNames(liveRates);
 
 
-var wsServer = http.createHttpServer();
-wsServer.websocketHandler(function(websocket) {
-	if (websocket.path() === '/fx/event') {
-		var listener = new FXClient(websocket);
-		var busCallback = function (data) {
-		  listener.publish(data);
-	    }
-		bus.registerHandler(requestTopic, busCallback);
-
-		websocket.closeHandler(function () {
-			bus.unregisterHandler(requestTopic, busCallback);
-			log.info("websocket closed.")
-		});
-		log.info("websocket setup.")
-	} else {
-		log.warning("Rejecting connection for " + websocket.path())
-		websocket.reject();
-	}        
-})
-.listen(wsPort, 'localhost');
-
-function FXClient(socket) {
-	this.socket = socket;
-}
-
-FXClient.prototype = {
-	publish : function(data) {
-		this.socket.writeTextFrame(JSON.stringify(data));
-	}
-}
-
 
 // evolve and publish every second
 var timerIdSpot = vertx.setPeriodic(1000, function (timerId) {
 	var message = evolveRates();
-	bus.publish(changeTopic, message);
+	if (message != null) 
+		bus.publish(changeTopic, message);
 })
 
 bus.registerHandler(requestTopic, fxrequestHandler, function() {
@@ -61,12 +32,15 @@ bus.registerHandler(requestTopic, fxrequestHandler, function() {
 });
 
 function fxrequestHandler(message, replier) {
-	replier(liveRates);
+	replier(JSON.stringify(liveRates));
 }
 
 function evolveRates() {
 	// decide how many items change
 	var m = Math.floor(Math.random() * names.length);
+
+	if (m == 0)
+		return null;
 
 	// shuffle and slice a la knuth
 	for (var i = 0; i < m; ++i) {
@@ -82,6 +56,7 @@ function evolveRates() {
 	for (var i = 0; i < selection.length; ++i) {
 		var obj = liveRates[selection[i]];
 		obj.value = randomRate(obj.value);
+		obj.ts = Date.now();
 		message.items.push(obj);
 	}
 	return message;

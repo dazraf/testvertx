@@ -10,11 +10,10 @@
 <script>
 
 $(function() {
-
   var fxvm = new FXViewModel([]);
   ko.applyBindings(fxvm);
   
-  var socket = new WebSocket("ws://localhost:8081/services/event");
+  var socket = new WebSocket("ws://localhost:8081/fx/event");
   socket.onmessage = function (event) {
     var data = JSON.parse(event.data).items;        
     fxvm.values.removeAll();

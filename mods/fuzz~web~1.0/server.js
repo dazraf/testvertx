@@ -2,6 +2,10 @@ var vertx = require('vertx');
 var container = require('vertx/container');
 var http = require('vertx/http');
 var log = container.logger;
+var bus = vertx.eventBus;
+
+var requestTopic = "fxservice.request";
+
 var routeMatcher = new http.RouteMatcher();
 
 routeMatcher.get('/', function(req) {
@@ -12,6 +16,13 @@ routeMatcher.get('/', function(req) {
 
 routeMatcher.get('/favicon.ico', function(req) {
 	req.response.sendFile('static/img/favicon.ico');
+});
+
+routeMatcher.get('/fx/', function(req) {
+	bus.send(requestTopic, null, function(data) {
+		req.response.headers('Content-Type', 'application/json');
+		req.response.end(data);
+	})
 });
 
 routeMatcher.getWithRegEx('^\/static\/(.*)', function (req) {

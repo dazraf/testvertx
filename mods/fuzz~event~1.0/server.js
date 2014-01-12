@@ -10,8 +10,8 @@ var topic = "fxservice.change";
 server.websocketHandler(function(websocket) {
 	if (websocket.path() === '/services/event') {
 		var listener = new FXClient(websocket);
-		var busCallback = function (rate) {
-		  listener.publish(rate);
+		var busCallback = function (data) {
+		  listener.publish(data);
 	    }
 		bus.registerHandler(topic, busCallback);
 
@@ -32,8 +32,8 @@ function FXClient(socket) {
 }
 
 FXClient.prototype = {
-	publish : function(rate) {
-		this.socket.writeTextFrame(JSON.stringify(rate));
+	publish : function(data) {
+		this.socket.writeTextFrame(JSON.stringify(data));
 	}
 }
 

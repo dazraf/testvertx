@@ -30,7 +30,8 @@ routeMatcher.get('/fx/', function(req) {
 routeMatcher.getWithRegEx('^\/static\/(.*)', function (req) {
 	var file = req.params().get('param0');
 	//log.info("sending " + file + " for general static request")
-	req.response.sendFile('static/' + file);	
+
+	req.response.sendFile('../../static/' + file);	
 });
 
 var server = http.createHttpServer();

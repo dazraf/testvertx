@@ -10,34 +10,89 @@
 <script type="text/javascript" src="/static/js/d3.min.js"></script>
 <script type="text/javascript" src="/static/js/cubism.v1.min.js"></script>
 
+<style>
+
+.chart div {
+  font: 10px sans-serif;
+  background-color: steelblue;
+  text-align: right;
+  padding: 3px;
+  margin: 1px;
+  color: white;
+}
+
+</style>
+
 <script>
+var buffers = {};
+var scales = {};
+
 var context = cubism.context()
     .serverDelay(0)
     .clientDelay(0)
-    .step(1e3)
+    .step(0.5e3)
     .size(700);
 
 $(function() {
-  getCurrentRates();
-  setupWebSocket();  
-  setupChart();
+  getCurrentRates(function () {
+    setupWebSocket();  
+    setupChart();
+  });
 });
 
-function getCurrentRates() {
+function getCurrentRates(callback) {
   $.ajax({
     url: "/fx/",
     cache: false
   }).done(function(data) {
-    console.log(data);
-  })
+    addRates(JSON.parse(data));
+    callback();
+  });
+}
+
+function addRates(items) {
+  for (var k in items) {
+    var item = items[k];
+    if (!(k in buffers)) {
+      buffers[k] = [];
+    }
+    buffers[k].push(item);
+  }
+}
+
+function rateKey(pair, tenor) {
+  return pair + '.' + tenor;
 }
 
 function setupWebSocket() {
   var socket = new WebSocket("ws://localhost:8081/fx/event");
   socket.onmessage = function (event) {
-    var data = JSON.parse(event.data).items;
-    console.log(event.data);
+    var data = JSON.parse(event.data);
+    addRates(data);
+    redraw();
   }
+}
+
+function rate(name) {
+  var value = 0,
+      values = [],
+      i = 0,
+      last;
+  return context.metric(function(start, stop, step, callback) {
+    // convert to milliseconds
+    start = +start, stop = +stop;
+    var buffer = buffers[name];
+    if (isNaN(last)) last = start;
+    for (; i < buffer.length && last < stop && buffer[i].ts < stop; ++i) {
+      var next = buffer[i];
+      if (next.ts >= start) {
+        last = next.ts;
+        values.push(next.value * 1000);
+      }
+    }
+    callback(null, values = values.slice((start - stop) / step));
+  }, name);
+
 }
 
 function random(name) {
@@ -58,9 +113,13 @@ function random(name) {
   }, name);
 }
 
+function itemValueAccessor(item) {
+  return item.value;
+}
 function setupChart() {
-  var foo = random('foo');
-  var bar = random('bar');
+  /*
+  var foo = rate('eurusd.spot');
+  // var bar = random('bar');
 
   d3.select('#chart').call(function(div) {
     div.append("div")
@@ -68,15 +127,67 @@ function setupChart() {
         .call(context.axis().orient("top"));
 
     div.selectAll(".horizon")
-        .data([foo, bar, foo.add(bar), foo.subtract(bar)])
+//        .data([foo, bar, foo.add(bar), foo.subtract(bar)])
+        .data([foo])
       .enter().append("div")
         .attr("class", "horizon")
-        .call(context.horizon().extent([-20, 20]));
+        .call(context.horizon().extent([1.35, 1.36]));
 
     div.append("div")
         .attr("class", "rule")
         .call(context.rule());
   });
+*/
+
+
+  setupScales();
+  var spots = d3.select('#chart')
+    .selectAll('div')
+      .data(d3.keys(buffers))
+    .enter().append('div')
+      .style('width', function(k) { 
+        var value = buffers[k].slice(-1)[0].value;
+        var range = scales[k](value);
+        console.log(k + ': ' + value + ' => ' + range);
+        return range + 'px';
+      })
+      .text(function(d) {
+       return d + ': ' + buffers[d].slice(-1)[0].value;
+      })
+}
+
+function setupScales() {
+    for (k in buffers) {
+    var buffer = buffers[k];
+    var min = d3.min(buffer, itemValueAccessor);
+    var max = d3.max(buffer, itemValueAccessor);
+    scales[k] = d3.scale
+        .linear()
+        .range([0, 700])
+        .domain([min - (min * 0.1), max + (max * 0.1)]).nice();
+  }
+}
+function redraw() {
+  setupScales();
+  var spots = d3.select('#chart')
+    .selectAll('div')
+      .data(d3.keys(buffers))
+    .enter().append('div')
+      .style('width', function(k) { 
+        var value = buffers[k].slice(-1)[0].value;
+        var range = scales[k](value);
+        console.log(k + ': ' + value + ' => ' + range);
+        return range + 'px';
+      })
+      .text(function(d) {
+       return d + ': ' + buffers[d].slice(-1)[0].value;
+      })
+    /*
+    .transition()
+      .duration(1000)
+      .attr("y", function(d) { return h - y(d.value) - .5; })
+      .attr("height", function(d) { return y(d.value); });  
+    */
 }
 </script>
   
@@ -90,9 +201,8 @@ function setupChart() {
 <h3 class="text-muted">Test Vert.X - Event Demo</h3>
 </div>
 
-
-<div id="chart"></div>
-
+<div id="chart" class='chart'></div>
+<svg id='spots'></svg>
 <div class="footer">
 <span style="-moz-transform: scaleX(-1); -o-transform: scaleX(-1); -webkit-transform: scaleX(-1); transform: scaleX(-1); display: inline-block;">
 &copy;

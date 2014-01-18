@@ -11,9 +11,9 @@ var wsPort = 8081;
 
 var liveRates = {
 	'eurusd.spot': {pair: 'eurusd', tenor: 'spot', value: 1.3791, ts: Date.now()},
-	'eurusd.1w': {pair: 'eurusd', tenor: '1w', value: -1.22, ts: Date.now()},
+	'eurusd.1w': {pair: 'eurusd', tenor: '1w', value: 1.22, ts: Date.now()},
 	'eurgbp.spot': {pair: 'eurgbp', tenor: 'spot', value: 0.8341, ts: Date.now()},
-	'eurgbp.1w': {pair: 'eurgbp', tenor: '1w', value: -8.9, ts: Date.now()}
+	'eurgbp.1w': {pair: 'eurgbp', tenor: '1w', value: 8.9, ts: Date.now()}
 };
 
 var names = Object.getOwnPropertyNames(liveRates);
@@ -52,18 +52,21 @@ function evolveRates() {
 	var selection = names.slice(0, m);
 
 	// evolve selection
-	var message = {items: []};
+	var message = {};
 	for (var i = 0; i < selection.length; ++i) {
 		var obj = liveRates[selection[i]];
 		obj.value = randomRate(obj.value);
 		obj.ts = Date.now();
-		message.items.push(obj);
+		message[selection[i]] = obj;
 	}
 	return message;
 }
 
 function randomRate(seedRate) {
-	return round(seedRate + ((Math.random() - 0.5) * 0.01), 4);	
+	var delta = ((Math.random() - 0.5) * 0.01);
+	if ( (seedRate + delta) < 0 )
+		delta = -delta;
+	return round(seedRate + delta, 4);	
 }
 
 function round(num, decimals) {

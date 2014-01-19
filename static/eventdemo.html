@@ -4,34 +4,29 @@
 <link rel="shortcut icon" href="/static/img/fa.gif">
 <link href="/static/css/bootstrap.css" rel="stylesheet">
 <link href="/static/css/jumbotron-narrow.css" rel="stylesheet">
-<script type="text/javascript" src="/static/js/vertxbus-2.1.js"></script>
 <script type="text/javascript" src="/static/js/jquery-2.0.3.min.js"></script>
-<script type="text/javascript" src="/static/js/knockout-3.0.0.js"></script>
 <script type="text/javascript" src="/static/js/d3.min.js"></script>
-<script type="text/javascript" src="/static/js/cubism.v1.min.js"></script>
 
 <style>
-
 .chart div {
-  font: 10px sans-serif;
-  background-color: steelblue;
+  font: 20px sans-serif;
+  background-color: rgb(127, 59, 8);
   text-align: right;
   padding: 3px;
   margin: 1px;
   color: white;
 }
-
 </style>
 
 <script>
 var buffers = {};
 var scales = {};
+var format = d3.format('.4f');
 
-var context = cubism.context()
-    .serverDelay(0)
-    .clientDelay(0)
-    .step(0.5e3)
-    .size(700);
+
+// from color brewer
+var colours = ['rgb(166,206,227)','rgb(31,120,180)','rgb(178,223,138)','rgb(51,160,44)','rgb(251,154,153)','rgb(227,26,28)','rgb(253,191,111)','rgb(255,127,0)','rgb(202,178,214)','rgb(106,61,154)'];
+
 
 $(function() {
   getCurrentRates(function () {
@@ -73,125 +68,61 @@ function setupWebSocket() {
   }
 }
 
-function rate(name) {
-  var value = 0,
-      values = [],
-      i = 0,
-      last;
-  return context.metric(function(start, stop, step, callback) {
-    // convert to milliseconds
-    start = +start, stop = +stop;
-    var buffer = buffers[name];
-    if (isNaN(last)) last = start;
-    for (; i < buffer.length && last < stop && buffer[i].ts < stop; ++i) {
-      var next = buffer[i];
-      if (next.ts >= start) {
-        last = next.ts;
-        values.push(next.value * 1000);
-      }
-    }
-    callback(null, values = values.slice((start - stop) / step));
-  }, name);
-
-}
-
-function random(name) {
-  var value = 0,
-      values = [],
-      i = 0,
-      last;
-  return context.metric(function(start, stop, step, callback) {
-    // convert to milliseconds
-    start = +start, stop = +stop;
-    if (isNaN(last)) last = start;
-    while (last < stop) {
-      last += step;
-      value = Math.max(-10, Math.min(10, value + .8 * Math.random() - .4 + .2 * Math.cos(i += .2)));
-      values.push(value);
-    }
-    callback(null, values = values.slice((start - stop) / step));
-  }, name);
-}
-
-function itemValueAccessor(item) {
-  return item.value;
-}
 function setupChart() {
-  /*
-  var foo = rate('eurusd.spot');
-  // var bar = random('bar');
-
-  d3.select('#chart').call(function(div) {
-    div.append("div")
-        .attr("class", "axis")
-        .call(context.axis().orient("top"));
-
-    div.selectAll(".horizon")
-//        .data([foo, bar, foo.add(bar), foo.subtract(bar)])
-        .data([foo])
-      .enter().append("div")
-        .attr("class", "horizon")
-        .call(context.horizon().extent([1.35, 1.36]));
-
-    div.append("div")
-        .attr("class", "rule")
-        .call(context.rule());
-  });
-*/
-
-
   setupScales();
+
   var spots = d3.select('#chart')
     .selectAll('div')
       .data(d3.keys(buffers))
     .enter().append('div')
-      .style('width', function(k) { 
-        var value = buffers[k].slice(-1)[0].value;
-        var range = scales[k](value);
-        console.log(k + ': ' + value + ' => ' + range);
-        return range + 'px';
-      })
+      .style('width', getWidth)
+      .style('background-color', scales['colours'])
       .text(function(d) {
-       return d + ': ' + buffers[d].slice(-1)[0].value;
-      })
+       return d + ' ' + format(buffers[d].slice(-1)[0].value);
+      });
 }
 
-function setupScales() {
-    for (k in buffers) {
-    var buffer = buffers[k];
-    var min = d3.min(buffer, itemValueAccessor);
-    var max = d3.max(buffer, itemValueAccessor);
-    scales[k] = d3.scale
-        .linear()
-        .range([0, 700])
-        .domain([min - (min * 0.1), max + (max * 0.1)]).nice();
-  }
-}
 function redraw() {
   setupScales();
   var spots = d3.select('#chart')
     .selectAll('div')
       .data(d3.keys(buffers))
-    .enter().append('div')
-      .style('width', function(k) { 
-        var value = buffers[k].slice(-1)[0].value;
-        var range = scales[k](value);
-        console.log(k + ': ' + value + ' => ' + range);
-        return range + 'px';
-      })
-      .text(function(d) {
-       return d + ': ' + buffers[d].slice(-1)[0].value;
-      })
-    /*
     .transition()
-      .duration(1000)
-      .attr("y", function(d) { return h - y(d.value) - .5; })
-      .attr("height", function(d) { return y(d.value); });  
-    */
+      .duration(500)
+      .style('width', getWidth)
+      .text(function(d) {
+       return d + ' ' + format(buffers[d].slice(-1)[0].value);
+      })
 }
+
+function setupScales() {
+  for (k in buffers) {
+    var buffer = buffers[k];
+    var min = d3.min(buffer, getValue);
+    var max = d3.max(buffer, getValue);
+    scales[k] = d3.scale
+        .linear()
+        .range([0, 700])
+        .domain([min - (min * 0.1), max + (max * 0.1)]).nice();
+  }
+  scales['colours'] = d3.scale.ordinal()
+    .domain(Object.keys(buffers))
+    .range(colours) ;
+}
+
+function getWidth(key) { 
+  var value = buffers[key].slice(-1)[0].value;
+  var range = scales[key](value);
+  return range + 'px';
+}
+
+function getValue(item) {
+  return item.value;
+}
+
 </script>
-  
 </head>
+
 <body>
 <div class="container">
 <div class="header">
@@ -202,11 +133,10 @@ function redraw() {
 </div>
 
 <div id="chart" class='chart'></div>
-<svg id='spots'></svg>
 <div class="footer">
 <span style="-moz-transform: scaleX(-1); -o-transform: scaleX(-1); -webkit-transform: scaleX(-1); transform: scaleX(-1); display: inline-block;">
 &copy;
-</span> Fuzz 2013
+</span>2013
 </div>
 </div> <!-- /container -->
 </body>
